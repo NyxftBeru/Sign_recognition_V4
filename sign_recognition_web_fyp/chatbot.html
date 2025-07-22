@@ -1,308 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SignEase Chatbot</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;400&display=swap" rel="stylesheet">
-  <style>
-    body.chatbot-page {
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      font-family: 'Poppins', sans-serif;
-      min-height: 100vh;
-      padding-top: 56px;
-    }
-    .navbar {
-      background: white;
-      padding: 0.75rem 3.5rem 0.75rem 2.5rem;
-      min-height: 48px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      z-index: 100;
-    }
-    .logo {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #2c3e50;
-      text-decoration: none;
-      letter-spacing: 1px;
-    }
-    .logo span {
-      color: #3498db;
-    }
-    .nav-links {
-      display: flex;
-      gap: 2rem;
-      padding-right: 3.5rem;
-    }
-    .nav-links a {
-      color: #2c3e50;
-      text-decoration: none;
-      font-weight: 500;
-    
-      transition: color 0.3s ease;
-      position: relative;
-      padding: 2px 0;
-    }
-    .nav-links a.active {
-      color: #3498db;
-      font-weight: 600;
-    }
-    .nav-links a:hover {
-      color: #3498db;
-    }
-    @media (max-width: 768px) {
-      .nav-links {
-        display: none;
-      }
-    }
-    .chatbot-container {
-      max-width: 500px;
-      margin: 48px auto;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 8px 32px rgba(44,62,80,0.10);
-      padding: 2rem;
-    }
-    .chatbox {
-      min-height: 180px;
-      max-height: 350px;
-      overflow-y: auto;
-      margin-bottom: 1.5rem;
-      background: #fafdff;
-      border-radius: 8px;
-      padding: 1rem;
-    }
-    .chat-message {
-      margin-bottom: 1rem;
-      display: flex;
-    }
-    .chat-message.user {
-      justify-content: flex-end;
-    }
-    .chat-message.bot {
-      justify-content: flex-start;
-    }
-    .bubble {
-      padding: 0.75rem 1.2rem;
-      border-radius: 18px;
-      background: #3498db;
-      color: #fff;
-      font-size: 1rem;
-      max-width: 80%;
-      word-break: break-word;
-    }
-    .chat-message.user .bubble {
-      background: #43e97b;
-      color: #fff;
-    }
-    .input-row {
-      display: flex;
-      gap: 0.5rem;
-    }
-    #userInput {
-      flex: 1;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      border: 1.5px solid #3498db;
-      font-size: 1rem;
-    }
-    .input-row button {
-      background: #3498db;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 0.75rem 1.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .input-row button:hover {
-      background: #2980b9;
-    }
-    .back-link {
-      display: block;
-      margin: 2rem auto 0 auto;
-      text-align: center;
-      color: #3498db;
-      font-weight: 600;
-      text-decoration: none;
-      font-size: 1.1rem;
-      transition: color 0.2s;
-    }
-    .back-link:hover {
-      color: #2980b9;
-      text-decoration: underline;
-    }
-    .typing {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background: #3498db;
-      border-radius: 50%;
-      animation: blink 1s infinite alternate;
-    }
-    .typing-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    .typing-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    @keyframes blink {
-      to {
-        opacity: 0.3;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignEase - Chatbot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .chat-container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 80vh; /* Set a fixed height for the chatbox */
+        }
+        .chat-header {
+            background-color: #3498db;
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.2em;
+            font-weight: 600;
+            text-align: center;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+        .chat-box {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+        .message {
+            max-width: 75%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .message.user {
+            align-self: flex-end;
+            background-color: #e0f2f7; /* Light blue for user messages */
+            color: #333;
+            border-bottom-right-radius: 2px;
+        }
+        .message.bot {
+            align-self: flex-start;
+            background-color: #f0f0f0; /* Light gray for bot messages */
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+        .chat-input {
+            display: flex;
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+        }
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 1em;
+            margin-right: 10px;
+        }
+        .chat-input button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .chat-input button:hover {
+            background-color: #2980b9;
+        }
+        .typing-bubble {
+            background-color: #f0f0f0;
+            display: flex;
+            gap: 4px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            align-self: flex-start;
+        }
+        .typing-bubble span {
+            animation: bounce 0.8s infinite alternate;
+            font-size: 1.2em;
+            color: #555;
+        }
+        .typing-bubble span:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+        .typing-bubble span:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0px); }
+            to { transform: translateY(-5px); }
+        }
+        .back-button {
+            position: absolute; /* Changed to absolute for consistent positioning */
+            top: 20px;
+            left: 20px;
+            text-decoration: none;
+            color: #3498db;
+            font-weight: 500;
+        }
+        .back-button:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
-<body class="chatbot-page">
-  <nav class="navbar">
-    <a href="index.html" class="logo">Sign<span>Ease</span></a>
-    <div class="nav-links">
-      <a href="index.html">Home</a>
-      <a href="predict_live.html">Try Demo</a>
-      <a href="about.html">About</a>
-      <a href="chatbot.html" class="active">Chatbot</a>
-      <a href="index.html#contact">Contact</a>
+<body>
+    <a href="index.html" class="back-button">← Back to Home</a>
+    <div class="chat-container">
+        <div class="chat-header">
+            SignEase Chatbot
+        </div>
+        <div class="chat-box" id="chatBox">
+            <div class="message bot">Hello! How can I help you today regarding sign language?</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="userInput" placeholder="Type your message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
     </div>
-  </nav>
 
-  <div class="chatbot-container">
-    <div class="chatbox" id="chatbox">
-      <div><em>Welcome! Ask me anything about sign language, gestures, or how to use SignEase.</em></div>
-    </div>
-    <div class="input-row">
-      <input type="text" id="userInput" placeholder="Type your message..." autocomplete="off" required />
-      <button onclick="sendMessage()">Send</button>
-    </div>
-    <a href="index.html" class="back-link">&larr; Back to Home</a>
-  </div>
+    <script src="/config.js"></script>
+    <script>
+        // Get the chatbot API URL from the config
+        const CHATBOT_API_URL = window.ENV_CONFIG.CHATBOT_API_URL;
+        console.log("Chatbot API URL:", CHATBOT_API_URL); // For debugging
 
-  <script>
-    const chatBox = document.getElementById('chatbox');
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
 
-    function appendMessage(text, sender = 'bot') {
-      const message = document.createElement('div');
-      message.classList.add('chat-message', sender);
-
-      const bubble = document.createElement('div');
-      bubble.classList.add('bubble');
-      bubble.innerHTML = text;
-
-      message.appendChild(bubble);
-      chatBox.appendChild(message);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function appendVideoOrEmbed(videoUrl) {
-      const message = document.createElement('div');
-      message.classList.add('chat-message', 'bot');
-      message.style.marginBottom = '1rem';
-
-      // Check if it's a Google Drive file link
-      const gdMatch = videoUrl.match(/https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
-
-      if (gdMatch && gdMatch[1]) {
-        const fileId = gdMatch[1];
-        const iframe = document.createElement('iframe');
-        iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
-        iframe.width = '100%';
-        iframe.height = 315;
-        iframe.allow = 'autoplay; encrypted-media';
-        iframe.style.border = 'none';
-        iframe.style.borderRadius = '12px';
-        message.appendChild(iframe);
-      } else {
-        // fallback to normal video tag for direct mp4 links
-        const video = document.createElement('video');
-        video.src = videoUrl;
-        video.controls = true;
-        video.style.maxWidth = '100%';
-        video.style.borderRadius = '12px';
-        message.appendChild(video);
-      }
-
-      chatBox.appendChild(message);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function appendTyping() {
-      const typingDiv = document.createElement('div');
-      typingDiv.classList.add('typing');
-      typingDiv.innerHTML = `
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-      `;
-      chatBox.appendChild(typingDiv);
-      chatBox.scrollTop = chatBox.scrollHeight;
-      return typingDiv;
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById('userInput');
-      const message = input.value.trim();
-      if (!message) return;
-
-      appendMessage(message, 'user');
-      input.value = '';
-
-      const typingBubble = appendTyping();
-
-      try {
-        const res = await fetch('https://n8nc240.southeastasia.cloudapp.azure.com/webhook/ae3921d3-262c-4503-99f0-939fb4709ab7', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: message })
-        });
-
-        // Check for valid JSON response
-        let data;
-        try {
-          data = await res.json();
-        } catch (e) {
-          const text = await res.text();
-          console.error('Response not JSON:', text);
-          appendMessage("⚠️ Received invalid response from server.");
-          chatBox.removeChild(typingBubble);
-          return;
+        // Function to append messages to the chat box
+        function appendMessage(text, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', sender);
+            messageElement.textContent = text;
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight; // Scroll to bottom
         }
 
-        chatBox.removeChild(typingBubble);
+        // Function to send message to the chatbot API
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === "") return; // Don't send empty messages
 
-        if (data && data.message) {
-          const message = data.message.replace(/\n/g, '<br>');
-          appendMessage(message, 'bot');
+            appendMessage(message, 'user'); // Add user message to chatbox
+            userInput.value = ''; // Clear input field
 
-          // Extract any URL ending with .mp4 or Google Drive link
-          const urlRegex = /(https?:\/\/[^\s<>"]+\.(mp4))|(https?:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+\/view)/gi;
-          const matches = [...data.message.matchAll(urlRegex)];
-          if (matches.length > 0) {
-            for (const match of matches) {
-              // match[0] is full matched URL
-              appendVideoOrEmbed(match[0].trim());
+            // Add typing indicator
+            const typingBubble = document.createElement('div');
+            typingBubble.classList.add('message', 'bot', 'typing-bubble');
+            typingBubble.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+            chatBox.appendChild(typingBubble);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                // Use the dynamically loaded CHATBOT_API_URL for the fetch request
+                const res = await fetch(`${CHATBOT_API_URL}`, { // Assuming your chatbot API has a /chat endpoint
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!res.ok) {
+                    const errorResponse = await res.text();
+                    throw new Error(`Chatbot API error! Status: ${res.status}. Message: ${errorResponse}`);
+                }
+
+                const data = await res.json();
+                chatBox.removeChild(typingBubble); // Remove typing indicator
+                appendMessage(data.response, 'bot'); // Add bot's response to chatbox
+
+            } catch (e) {
+                console.error("Error communicating with chatbot:", e);
+                if (chatBox.contains(typingBubble)) {
+                    chatBox.removeChild(typingBubble); // Remove typing indicator on error
+                }
+                appendMessage("⚠️ Error connecting to chatbot service. Please try again later.", 'bot');
             }
-          }
-        } else {
-          appendMessage("⚠️ Sorry, I didn't get a proper response.");
         }
 
-      } catch (err) {
-        chatBox.removeChild(typingBubble);
-        appendMessage("❌ Couldn't reach the AI service.");
-      }}
-  </script>
+        // Allow sending message by pressing Enter key
+        userInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
 </body>
 </html>
