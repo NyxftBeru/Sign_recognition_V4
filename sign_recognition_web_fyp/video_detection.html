@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignEase - Video Prediction</title>
+
+  <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    h1 {
+      text-align: center;
+      width: 100%;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+    }
+
+    .navbar {
+      background: white;
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .logo {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #2c3e50;
+      text-decoration: none;
+    }
+
+    .logo span {
+      color: #3498db;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+    }
+
+    .nav-links a {
+      color: #2c3e50;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+
+    .nav-links a:hover {
+      color: #3498db;
+    }
+    /* ...existing code... */
+    #videoDetectionSection {
+      width: 100%;
+      max-width: 800px;
+      padding: 20px;
+      box-sizing: border-box;
+      text-align: center;
+      margin: 0 auto;
+    }
+    .videoView {
+      position: relative;
+      width: 100%;
+      max-width: 640px; /* Adjust as needed */
+      margin: 20px auto;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .videoView video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .videoView canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* Allows clicks to pass through to elements beneath */
+    }
+    #videoPredictionResult {
+      margin-top: 20px;
+      font-size: 1.5em;
+      color: #333;
+      font-weight: bold;
+      min-height: 1.5em; /* Reserve space */
+    }
+    #videoFileInput {
+      margin-top: 10px;
+    }
+    #uploadedVideoContainer {
+      display: none; /* Hidden by default until video is loaded */
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"
+        }
+    }
+  </script>
+
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="logo">Sign<span>Ease</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="predict_live.html">Try Demo</a>
+      <a href="about.html">About</a>
+      <a href="chatbot.html">Chatbot</a>
+      <a href="#contact">Contact</a>
+      <a href="/profile">Profile</a>
+    </div>
+  </nav>
+
+  <h1 style="margin-top: 32px;">Video Sign Language Prediction</h1>
+
+  <section id="videoDetectionSection">
+    <p>Upload a video file to get sign language predictions. Once uploaded, the video will play and predictions will appear below.</p>
+
+    <input type="file" id="videoFileInput" accept="video/*"/>
+
+    <div id="uploadedVideoContainer" class="videoView">
+      <video id="uploadedVideo" controls muted loop></video>
+      <canvas class="output_canvas" id="uploadedVideoCanvas"></canvas>
+    </div>
+
+    <h2 id="videoPredictionResult">Prediction: Waiting for video...</h2>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+
+  <script type="module" src="dist/video_detection.js"></script>
+
+</body>
+</html>
