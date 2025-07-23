@@ -1,249 +1,375 @@
-// frontend/predict_live_logic.js
+// dist/test.js
 
-// Import MediaPipe Task Vision API components
+// 1. Core MediaPipe Tasks Vision imports
+// This is the ONLY import needed from @mediapipe/tasks-vision.
+// We are NOT importing DrawingUtils from here.
 import {
     HandLandmarker,
+    FilesetResolver,
+    FaceLandmarker,
     PoseLandmarker,
-    FaceDetector,
-    FilesetResolver
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
 
-// Access the Python API URL from the global config object loaded by /config.js
-const PYTHON_API_URL = window.ENV_CONFIG.PYTHON_API_URL;
-console.log("Backend API URL:", PYTHON_API_URL);
 
-// Get DOM elements
+// 2. Declare all DOM elements and state variables at the top-level
+const demosSection = document.getElementById("demos");
+const predictionResult = document.getElementById("predictionResult");
 const video = document.getElementById("webcam");
 const canvasElement = document.getElementById("output_canvas");
-const canvasCtx = canvasElement.getContext("2d");
-const predictionResultDiv = document.getElementById("predictionResult");
-const enablePredictionsButton = document.getElementById("webcamButton");
+const canvasCtx = canvasElement?.getContext("2d");
+let enableWebcamButton = null;
 
-// MediaPipe Landmarker and Detector instances
-let handLandmarker;
-let poseLandmarker;
-let faceDetector;
-let runningMode = "VIDEO"; // Set running mode for continuous video processing
-let lastVideoTime = -1; // To track video frames and avoid redundant processing
-let isPredicting = false; // Control prediction loop
+let handLandmarker = undefined;
+let faceLandmarker = undefined;
+let poseLandmarker = undefined;
+let webcamRunning = false;
+let PYTHON_API_URL = ''; // Declare variable to hold the backend URL
 
-// Drawing utilities from MediaPipe (becomes global after import)
-const drawingUtils = window;
+// CRITICAL: We declare these variables but do NOT initialize them with imports.
+// We will access them from the global 'window' object dynamically.
+let HAND_CONNECTIONS = [];
+let POSE_CONNECTIONS = [];
+let drawConnectors = undefined; // Will be window.drawConnectors
+let drawLandmarks = undefined;   // Will be window.drawLandmarks
 
-// Asynchronously initialize MediaPipe models
-const createLandmarkers = async () => {
+// Function to ensure global constants and drawing utilities are loaded.
+// This handles the asynchronous nature of script loading.
+const ensureGlobalsAreLoaded = () => {
+    if (window.HAND_CONNECTIONS && window.POSE_CONNECTIONS && window.drawConnectors && window.drawLandmarks) {
+        HAND_CONNECTIONS = window.HAND_CONNECTIONS;
+        POSE_CONNECTIONS = window.POSE_CONNECTIONS;
+        drawConnectors = window.drawConnectors;
+        drawLandmarks = window.drawLandmarks;
+        console.log("MediaPipe global constants and drawing utilities loaded.");
+    } else {
+        console.warn("MediaPipe global dependencies not yet available on window. Retrying...");
+        // If not available, retry after a short delay. This handles module load order.
+        setTimeout(ensureGlobalsAreLoaded, 100);
+    }
+};
+
+// --- Fetch API URLs from config.js ---
+async function fetchConfig() {
     try {
-        const vision = await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-        );
+        const response = await fetch('/config.js');
+        const configText = await response.text();
+        // Extract PYTHON_API_URL from the config.js content
+        const match = configText.match(/const PYTHON_API_URL = '(.*?)';/);
+        if (match && match[1]) {
+            PYTHON_API_URL = match[1];
+            console.log('PYTHON_API_URL:', PYTHON_API_URL);
+        } else {
+            console.error('PYTHON_API_URL not found in config.js');
+            predictionResult.innerText = 'Error: API URL not configured.';
+        }
+    } catch (error) {
+        console.error('Failed to fetch config.js:', error);
+        predictionResult.innerText = 'Error: Could not load configuration.';
+    }
+}
 
-        // Hand Landmarker
-        handLandmarker = await HandLandmarker.createFromOptions(vision, {
+
+// --- Model Loading ---
+const createDetectors = async () => {
+    if (!FilesetResolver) {
+        console.error("FilesetResolver is still undefined even after direct module import. Check CDN path or bundle content.");
+        if (demosSection) {
+            demosSection.innerHTML = "Error: MediaPipe components not loaded. Check console.";
+        }
+        return;
+    }
+
+    try {
+        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+        // Initialize HandLandmarker
+        const handOptions = {
             baseOptions: {
                 modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                delegate: "GPU" // Use GPU if available for better performance, fallback to CPU
+                delegate: "GPU"
             },
-            runningMode: runningMode,
-            numHands: 1 // Assuming only one hand is relevant for your signs
-        });
+            runningMode: "VIDEO",
+            numHands: 1
+        };
+        handLandmarker = await HandLandmarker.createFromOptions(vision, handOptions);
+        console.log("HandLandmarker model loaded successfully!");
 
-        // Pose Landmarker (for shoulders)
-        poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        // Initialize FaceLandmarker
+        // Using FaceLandmarker instead of FaceDetector for consistency and richer data if needed
+        const faceOptions = {
+            baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`, // Corrected to landmarker
+                delegate: "GPU"
+            },
+            runningMode: "VIDEO",
+            outputFaceBlendshapes: false,
+            numFaces: 1
+        };
+        faceLandmarker = await FaceLandmarker.createFromOptions(vision, faceOptions);
+        console.log("FaceLandmarker model loaded successfully!");
+
+        // Initialize PoseLandmarker
+        const poseOptions = {
             baseOptions: {
                 modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
                 delegate: "GPU"
             },
-            runningMode: runningMode,
-        });
+            runningMode: "VIDEO",
+            numPoses: 1
+        };
+        poseLandmarker = await PoseLandmarker.createFromOptions(vision, poseOptions);
+        console.log("PoseLandmarker model loaded successfully!");
 
-        // Face Detector (for face bounding box center)
-        faceDetector = await FaceDetector.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/face_detector_lite/float16/1/face_detector_lite.task`,
-                delegate: "GPU"
-            },
-            runningMode: runningMode,
-            minDetectionConfidence: 0.5
-        });
+        if (demosSection) {
+            demosSection.classList.remove("invisible");
+        }
 
-        console.log("MediaPipe models loaded!");
-        enablePredictionsButton.disabled = false;
-        enablePredictionsButton.textContent = "ENABLE PREDICTIONS";
+        // After all models are loaded, ensure global connections and drawing utils are available
+        ensureGlobalsAreLoaded();
+
     } catch (error) {
         console.error("Failed to load MediaPipe models:", error);
-        predictionResultDiv.textContent = "Error: Failed to load AI models. Check console for details.";
-        enablePredictionsButton.disabled = true;
+        if (demosSection) {
+            demosSection.innerHTML = "Failed to load ML models. Please check console for details.";
+        }
     }
 };
 
-createLandmarkers(); // Call to load models when script starts
+// Call this function when the script loads
+fetchConfig().then(() => {
+    createDetectors();
+});
 
-// Event listener for the webcam button
-enablePredictionsButton.addEventListener("click", enableCam);
 
-function enableCam() {
-    if (!handLandmarker || !poseLandmarker || !faceDetector) {
-        console.log("Wait! MediaPipe models not loaded yet.");
-        predictionResultDiv.textContent = "Prediction: Waiting for AI models to load...";
-        return;
+// --- Webcam Continuous Detection ---
+const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
+
+if (hasGetUserMedia()) {
+    enableWebcamButton = document.getElementById("webcamButton");
+    if (enableWebcamButton) {
+        enableWebcamButton.addEventListener("click", enableCam);
+    } else {
+        console.warn("Webcam enable button not found.");
     }
-
-    if (isPredicting) {
-        // Stop current prediction
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-        }
-        video.pause();
-        isPredicting = false;
-        enablePredictionsButton.textContent = "ENABLE PREDICTIONS";
-        predictionResultDiv.textContent = "Prediction: Stopped";
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Clear canvas
-        return;
-    }
-
-    // Start webcam
-    const constraints = { video: true };
-    navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
-        video.srcObject = stream;
-        video.addEventListener("loadeddata", predictWebcam);
-        enablePredictionsButton.textContent = "STOP PREDICTIONS";
-        isPredicting = true;
-    }).catch(function(err) {
-        console.error("Error accessing webcam:", err);
-        predictionResultDiv.textContent = "Error: Could not access webcam. Please ensure it's not in use and permissions are granted.";
-    });
+} else {
+    console.warn("getUserMedia() is not supported by your browser");
 }
 
-// Prediction loop for webcam feed
+function enableCam(event) {
+    if (!handLandmarker || !faceLandmarker || !poseLandmarker || !PYTHON_API_URL) {
+        console.log("Wait! MediaPipe detectors or API URL not loaded yet. Retrying in 1 second...");
+        setTimeout(() => enableCam(event), 1000);
+        return;
+    }
+
+    if (webcamRunning === true) {
+        webcamRunning = false;
+        if (enableWebcamButton)
+            enableWebcamButton.innerText = "ENABLE PREDICTIONS";
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        if (canvasCtx && canvasElement) {
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        }
+        if (predictionResult) {
+            predictionResult.innerText = "Prediction: Disabled";
+        }
+    } else {
+        webcamRunning = true;
+        if (enableWebcamButton)
+            enableWebcamButton.innerText = "DISABLE PREDICTIONS";
+        const constraints = {
+            video: true
+        };
+        navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+            video.srcObject = stream;
+            video.addEventListener("loadeddata", predictWebcam);
+        }).catch(err => {
+            console.error("Error accessing webcam:", err);
+            webcamRunning = false;
+            if (enableWebcamButton)
+                enableWebcamButton.innerText = "ENABLE PREDICTIONS";
+            if (predictionResult) {
+                predictionResult.innerText = "Prediction: Webcam access denied or error";
+            }
+        });
+    }
+}
+
+let lastVideoTime = -1;
+let handResults = undefined;
+let faceResults = undefined;
+let poseResults = undefined;
+
 async function predictWebcam() {
-    // Set canvas dimensions to match video
-    canvasElement.style.width = video.videoWidth + "px";
-    canvasElement.style.height = video.videoHeight + "px";
+    if (!video || !canvasElement || !canvasCtx || !handLandmarker || !faceLandmarker || !poseLandmarker || !PYTHON_API_URL) {
+        console.warn("Required elements, MediaPipe detectors, or API URL not ready for webcam prediction. Halting loop.");
+        return;
+    }
+
+    // Ensure global drawing functions and constants are available before attempting to draw
+    if (!drawConnectors || !drawLandmarks || HAND_CONNECTIONS.length === 0 || POSE_CONNECTIONS.length === 0) {
+        console.warn("MediaPipe global drawing functions or connection constants not yet loaded. Skipping drawing this frame.");
+        if (webcamRunning === true) {
+            window.requestAnimationFrame(predictWebcam); // Keep trying in next frame
+        }
+        return;
+    }
+
+
+    canvasElement.style.width = video.offsetWidth + "px";
+    canvasElement.style.height = video.offsetHeight + "px";
     canvasElement.width = video.videoWidth;
     canvasElement.height = video.videoHeight;
 
-    let startTimeMs = performance.now(); // Current time for MediaPipe's detectForVideo
+    let startTimeMs = performance.now();
 
-    // Only process if the video time has changed (new frame)
     if (lastVideoTime !== video.currentTime) {
         lastVideoTime = video.currentTime;
+        handResults = handLandmarker.detectForVideo(video, startTimeMs);
+        faceResults = faceLandmarker.detectForVideo(video, startTimeMs);
+        poseResults = poseLandmarker.detectForVideo(video, startTimeMs);
+    } else {
+        if (webcamRunning === true) {
+            window.requestAnimationFrame(predictWebcam);
+        }
+        return;
+    }
 
-        // Perform detections
-        const handResults = handLandmarker.detectForVideo(video, startTimeMs);
-        const poseResults = poseLandmarker.detectForVideo(video, startTimeMs);
-        const faceResults = faceDetector.detectForVideo(video, startTimeMs);
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.scale(-1, 1);
+    canvasCtx.translate(-canvasElement.width, 0);
+    canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
 
-        // Clear canvas and draw video frame
-        canvasCtx.save();
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+    const features = [];
 
-        const features = []; // Array to store 46 features
-
-        // --- Extract Hand Landmarks (42 features: 21 x, 21 y) ---
-        if (handResults.landmarks.length > 0) {
-            const handLandmarks = handResults.landmarks[0]; // Assuming only one hand
-            for (const landmark of handLandmarks) {
-                features.push(landmark.x, landmark.y);
-            }
-            // Draw hand landmarks and connections
-            drawingUtils.drawConnectors(canvasCtx, handLandmarks, HandLandmarker.HAND_CONNECTIONS, {
-                color: "#00FF00",
-                lineWidth: 5
-            });
-            drawingUtils.drawLandmarks(canvasCtx, handLandmarks, {
+    if (handResults && handResults.landmarks && handResults.landmarks.length > 0) {
+        const landmarks = handResults.landmarks[0];
+        for (const landmark of landmarks) {
+            features.push(landmark.x, landmark.y);
+        }
+        const debugHandLandmarks = landmarks.map(lm => ({ ...lm, visibility: 1 }));
+        drawConnectors( // Call the global function
+            canvasCtx,
+            debugHandLandmarks,
+            HAND_CONNECTIONS, // This will be the global HAND_CONNECTIONS
+            { color: "#00FF00", lineWidth: 5 }
+        );
+        drawLandmarks( // Call the global function
+            canvasCtx,
+            debugHandLandmarks,
+            {
                 color: "#FF0000",
-                lineWidth: 2
-            });
-        } else {
-            // If no hand detected, push 0s for all 42 hand features
-            for (let i = 0; i < 42; i++) {
-                features.push(0);
+                lineWidth: 3
             }
-        }
-
-        // --- Extract Face Center (2 features: x, y of bounding box center) ---
-        let face_x = 0;
-        let face_y = 0;
-        if (faceResults.detections.length > 0) {
-            const boundingBox = faceResults.detections[0].boundingBox;
-            face_x = boundingBox.originX + boundingBox.width / 2;
-            face_y = boundingBox.originY + boundingBox.height / 2;
-            // Optionally draw face bounding box (MediaPipe FaceDetector only provides bounding box)
-            // canvasCtx.beginPath();
-            // canvasCtx.rect(boundingBox.originX, boundingBox.originY, boundingBox.width, boundingBox.height);
-            // canvasCtx.strokeStyle = "#0000FF";
-            // canvasCtx.lineWidth = 2;
-            // canvasCtx.stroke();
-        }
-        features.push(face_x, face_y);
-
-        // --- Extract Chest Midpoint (2 features: x, y of midpoint between shoulders) ---
-        let chest_x = 0;
-        let chest_y = 0;
-        if (poseResults.landmarks.length > 0) {
-            const poseLandmarks = poseResults.landmarks[0];
-            const leftShoulder = poseLandmarks[drawingUtils.POSE_LANDMARKS.LEFT_SHOULDER];
-            const rightShoulder = poseLandmarks[drawingUtils.POSE_LANDMARKS.RIGHT_SHOULDER];
-
-            if (leftShoulder && rightShoulder) {
-                chest_x = (leftShoulder.x + rightShoulder.x) / 2;
-                chest_y = (leftShoulder.y + rightShoulder.y) / 2;
-                // Draw a small circle for the chest midpoint for visualization
-                // canvasCtx.beginPath();
-                // canvasCtx.arc(chest_x * canvasElement.width, chest_y * canvasElement.height, 5, 0, 2 * Math.PI);
-                // canvasCtx.fillStyle = "#FFFF00";
-                // canvasCtx.fill();
-            }
-            // Draw full pose for visualization (optional)
-            drawingUtils.drawConnectors(canvasCtx, poseLandmarks, drawingUtils.POSE_CONNECTIONS, {
-                color: "#AAAAAA",
-                lineWidth: 2
-            });
-            drawingUtils.drawLandmarks(canvasCtx, poseLandmarks, {
-                color: "#CCCCCC",
-                lineWidth: 1
-            });
-        }
-        features.push(chest_x, chest_y);
-
-        canvasCtx.restore(); // Restore canvas state
-
-        // --- Sanity check: Ensure we have exactly 46 features ---
-        if (features.length !== 46) {
-            console.warn(`Expected 46 features, but got ${features.length}. Padding/Truncating...`);
-            while(features.length < 46) features.push(0); // Pad with zeros if less
-            if (features.length > 46) features.splice(46); // Truncate if more
-        }
-
-        // --- Send features to your Python backend ---
-        if (isPredicting) { // Only send if actively predicting
-            try {
-                const response = await fetch(`${PYTHON_API_URL}/predict`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        features: features
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! Status: ${response.status}. Message: ${errorText}`);
-                }
-                const data = await response.json();
-                predictionResultDiv.textContent = `Prediction: ${data.predicted_gloss} (Confidence: ${(data.confidence * 100).toFixed(2)}%)`;
-            } catch (error) {
-                console.error("Error sending features to backend:", error);
-                predictionResultDiv.textContent = `Prediction Error: ${error.message}`;
-            }
+        );
+    } else {
+        // Push 42 zeros if no hand detected (21 landmarks * 2 coords)
+        for (let i = 0; i < 42; i++) {
+            features.push(0);
         }
     }
 
-    // Call this function again to keep predicting when the browser is ready.
-    if (isPredicting) {
+    if (faceResults && faceResults.faceRects && faceResults.faceRects.length > 0) {
+        const faceRect = faceResults.faceRects[0].boundingBox;
+        // Face Landmarker results also provide `faceRects` as bounding boxes
+        const face_x = faceRect.x + faceRect.width / 2;
+        const face_y = faceRect.y + faceRect.height / 2;
+        features.push(face_x, face_y);
+
+        canvasCtx.strokeStyle = '#00BFFF';
+        canvasCtx.lineWidth = 2;
+        // MediaPipe Tasks bounding boxes are normalized [0,1], so multiply by canvas dimensions
+        canvasCtx.strokeRect(faceRect.x * canvasElement.width, faceRect.y * canvasElement.height,
+                             faceRect.width * canvasElement.width, faceRect.height * canvasElement.height);
+    } else {
+        features.push(0, 0); // Push 2 zeros if no face detected
+    }
+
+    if (poseResults && poseResults.landmarks && poseResults.landmarks.length > 0) {
+        const poseLandmarks = poseResults.landmarks[0];
+        const LEFT_SHOULDER_IDX = 11;
+        const RIGHT_SHOULDER_IDX = 12;
+
+        const leftShoulder = poseLandmarks[LEFT_SHOULDER_IDX];
+        const rightShoulder = poseLandmarks[RIGHT_SHOULDER_IDX];
+
+        // Check if shoulders are detected with sufficient visibility
+        if (leftShoulder && rightShoulder && leftShoulder.visibility > 0.5 && rightShoulder.visibility > 0.5) {
+            const chest_x = (leftShoulder.x + rightShoulder.x) / 2;
+            const chest_y = (leftShoulder.y + rightShoulder.y) / 2;
+            features.push(chest_x, chest_y);
+
+            const debugPoseLandmarks = poseLandmarks.map(lm => ({ ...lm, visibility: 1 }));
+            drawConnectors( // Call the global function
+                canvasCtx,
+                debugPoseLandmarks,
+                POSE_CONNECTIONS, // This will be the global POSE_CONNECTIONS
+                { color: '#FFFF00', lineWidth: 2 }
+            );
+            drawLandmarks( // Call the global function
+                canvasCtx,
+                [leftShoulder, rightShoulder],
+                { color: '#00FFFF', lineWidth: 5 }
+            );
+        } else {
+            features.push(0, 0); // Push 2 zeros if shoulders not detected or not visible
+        }
+    } else {
+        features.push(0, 0); // Push 2 zeros if no pose detected
+    }
+
+    // Final check for feature length
+    // The current logic produces 46 features.
+    // Ensure your Python backend (server.py and train_model.py)
+    // is configured to expect 46 features (EXPECTED_FEATURE_COUNT = 46).
+    if (features.length !== 46) {
+        console.warn(`Feature array length mismatch: Expected 46, got ${features.length}. This might cause backend errors.`);
+        // You might want to handle this more robustly, e.g., by resetting or padding.
+        // For now, we'll let it pass but log a warning.
+    }
+
+    try {
+        // Use the dynamically loaded PYTHON_API_URL
+        const response = await fetch(`${PYTHON_API_URL}/predict`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ features: features })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const predicted_gloss = data.predicted_gloss; // Use predicted_gloss as per server.py
+            const confidence = data.confidence;
+            if (predictionResult) {
+                if (predicted_gloss && confidence !== undefined) {
+                    predictionResult.innerText = `Prediction: ${predicted_gloss} (Confidence: ${confidence.toFixed(2)})`;
+                } else {
+                    predictionResult.innerText = `Prediction: ${predicted_gloss || 'N/A'}`;
+                }
+            }
+        } else {
+            console.error('Server error:', response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Server error details:', errorText);
+            if (predictionResult) {
+                predictionResult.innerText = `Prediction: Server Error (${response.status})`;
+            }
+        }
+    } catch (error) {
+        console.error('Network error during prediction:', error);
+        if (predictionResult) {
+            predictionResult.innerText = 'Prediction: Network Error (Is backend server running?)';
+        }
+    }
+
+    canvasCtx.restore();
+
+    if (webcamRunning === true) {
         window.requestAnimationFrame(predictWebcam);
     }
 }
