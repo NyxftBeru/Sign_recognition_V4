@@ -26,53 +26,35 @@ let webcamRunning = false;
 let PYTHON_API_URL = ''; // Declare variable to hold the backend URL
 
 // CRITICAL: We declare these variables but do NOT initialize them with imports.
-// We will access them from the global 'window' object dynamically.
+// We will access them from the global 'window' object dynamically after the CDN scripts load.
 let HAND_CONNECTIONS = [];
 let POSE_CONNECTIONS = [];
 let drawConnectors = undefined; // Will be window.drawConnectors
-let drawLandmarks = undefined;   // Will be window.drawLandmarks
+let drawLandmarks = undefined;   // Will be window.drawLandmarks
 
 // Function to ensure global constants and drawing utilities are loaded.
 // This handles the asynchronous nature of script loading.
 const ensureGlobalsAreLoaded = () => {
+    // Check if the global MediaPipe drawing utilities and constants are available
     if (window.HAND_CONNECTIONS && window.POSE_CONNECTIONS && window.drawConnectors && window.drawLandmarks) {
         HAND_CONNECTIONS = window.HAND_CONNECTIONS;
         POSE_CONNECTIONS = window.POSE_CONNECTIONS;
         drawConnectors = window.drawConnectors;
         drawLandmarks = window.drawLandmarks;
         console.log("MediaPipe global constants and drawing utilities loaded.");
+        return true; // Indicate success
     } else {
         console.warn("MediaPipe global dependencies not yet available on window. Retrying...");
-        // If not available, retry after a short delay. This handles module load order.
-        setTimeout(ensureGlobalsAreLoaded, 100);
+        return false; // Indicate failure
     }
 };
-
-// --- Fetch API URLs from config.js ---
-async function fetchConfig() {
-    try {
-        const response = await fetch('/config.js');
-        const configText = await response.text();
-        // Extract PYTHON_API_URL from the config.js content
-        const match = configText.match(/const PYTHON_API_URL = '(.*?)';/);
-        if (match && match[1]) {
-            PYTHON_API_URL = match[1];
-            console.log('PYTHON_API_URL:', PYTHON_API_URL);
-        } else {
-            console.error('PYTHON_API_URL not found in config.js');
-            predictionResult.innerText = 'Error: API URL not configured.';
-        }
-    } catch (error) {
-        console.error('Failed to fetch config.js:', error);
-        predictionResult.innerText = 'Error: Could not load configuration.';
-    }
-}
 
 
 // --- Model Loading ---
 const createDetectors = async () => {
+    // Ensure FilesetResolver is available from the vision_bundle.js import
     if (!FilesetResolver) {
-        console.error("FilesetResolver is still undefined even after direct module import. Check CDN path or bundle content.");
+        console.error("FilesetResolver is still undefined. Check CDN path or bundle content.");
         if (demosSection) {
             demosSection.innerHTML = "Error: MediaPipe components not loaded. Check console.";
         }
@@ -81,6 +63,7 @@ const createDetectors = async () => {
 
     try {
         const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+        
         // Initialize HandLandmarker
         const handOptions = {
             baseOptions: {
@@ -94,10 +77,9 @@ const createDetectors = async () => {
         console.log("HandLandmarker model loaded successfully!");
 
         // Initialize FaceLandmarker
-        // Using FaceLandmarker instead of FaceDetector for consistency and richer data if needed
         const faceOptions = {
             baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`, // Corrected to landmarker
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
                 delegate: "GPU"
             },
             runningMode: "VIDEO",
@@ -124,7 +106,20 @@ const createDetectors = async () => {
         }
 
         // After all models are loaded, ensure global connections and drawing utils are available
-        ensureGlobalsAreLoaded();
+        // This is a crucial step to make sure drawing functions are ready before predictWebcam runs.
+        const webcamButton = document.getElementById("webcamButton");
+        if (webcamButton) {
+            webcamButton.disabled = false;
+            webcamButton.innerText = "ENABLE PREDICTIONS";
+        }
+        
+        // Start checking for global drawing libs after models are loaded
+        const checkDrawingGlobals = () => {
+            if (!ensureGlobalsAreLoaded()) {
+                setTimeout(checkDrawingGlobals, 100); // Retry if not loaded
+            }
+        };
+        checkDrawingGlobals();
 
     } catch (error) {
         console.error("Failed to load MediaPipe models:", error);
@@ -134,9 +129,21 @@ const createDetectors = async () => {
     }
 };
 
-// Call this function when the script loads
-fetchConfig().then(() => {
-    createDetectors();
+
+// --- Get API URL from window.ENV_CONFIG ---
+// This will be called once the DOM is ready and window.ENV_CONFIG is expected to be populated
+document.addEventListener('DOMContentLoaded', () => {
+    const checkEnvConfigAndInit = () => {
+        if (window.ENV_CONFIG && window.ENV_CONFIG.PYTHON_API_URL) {
+            PYTHON_API_URL = window.ENV_CONFIG.PYTHON_API_URL;
+            console.log('PYTHON_API_URL from window.ENV_CONFIG:', PYTHON_API_URL);
+            createDetectors(); // Start loading MediaPipe models
+        } else {
+            console.warn("window.ENV_CONFIG.PYTHON_API_URL not yet available. Retrying...");
+            setTimeout(checkEnvConfigAndInit, 100); // Retry after a short delay
+        }
+    };
+    checkEnvConfigAndInit();
 });
 
 
@@ -157,6 +164,7 @@ if (hasGetUserMedia()) {
 function enableCam(event) {
     if (!handLandmarker || !faceLandmarker || !poseLandmarker || !PYTHON_API_URL) {
         console.log("Wait! MediaPipe detectors or API URL not loaded yet. Retrying in 1 second...");
+        // Re-check and re-call enableCam after a delay
         setTimeout(() => enableCam(event), 1000);
         return;
     }
@@ -184,6 +192,7 @@ function enableCam(event) {
         };
         navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
             video.srcObject = stream;
+            // Add a loadeddata event listener to ensure the video is ready
             video.addEventListener("loadeddata", predictWebcam);
         }).catch(err => {
             console.error("Error accessing webcam:", err);
@@ -203,9 +212,10 @@ let faceResults = undefined;
 let poseResults = undefined;
 
 async function predictWebcam() {
+    // Crucial check: ensure all necessary components are ready
     if (!video || !canvasElement || !canvasCtx || !handLandmarker || !faceLandmarker || !poseLandmarker || !PYTHON_API_URL) {
         console.warn("Required elements, MediaPipe detectors, or API URL not ready for webcam prediction. Halting loop.");
-        return;
+        return; // Stop the prediction loop if essentials are missing
     }
 
     // Ensure global drawing functions and constants are available before attempting to draw
@@ -217,7 +227,7 @@ async function predictWebcam() {
         return;
     }
 
-
+    // Set canvas dimensions to match video
     canvasElement.style.width = video.offsetWidth + "px";
     canvasElement.style.height = video.offsetHeight + "px";
     canvasElement.width = video.videoWidth;
@@ -225,12 +235,14 @@ async function predictWebcam() {
 
     let startTimeMs = performance.now();
 
+    // Only run detection if the video frame has changed
     if (lastVideoTime !== video.currentTime) {
         lastVideoTime = video.currentTime;
         handResults = handLandmarker.detectForVideo(video, startTimeMs);
         faceResults = faceLandmarker.detectForVideo(video, startTimeMs);
         poseResults = poseLandmarker.detectForVideo(video, startTimeMs);
     } else {
+        // If the video hasn't changed, just request the next frame without re-processing
         if (webcamRunning === true) {
             window.requestAnimationFrame(predictWebcam);
         }
@@ -239,25 +251,28 @@ async function predictWebcam() {
 
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    // Flip the canvas horizontally for a mirror effect matching webcam
     canvasCtx.scale(-1, 1);
     canvasCtx.translate(-canvasElement.width, 0);
     canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
 
     const features = [];
 
+    // Process Hand Landmarks
     if (handResults && handResults.landmarks && handResults.landmarks.length > 0) {
-        const landmarks = handResults.landmarks[0];
+        const landmarks = handResults.landmarks[0]; // Assuming single hand detection
         for (const landmark of landmarks) {
             features.push(landmark.x, landmark.y);
         }
-        const debugHandLandmarks = landmarks.map(lm => ({ ...lm, visibility: 1 }));
-        drawConnectors( // Call the global function
+        // Draw hand landmarks and connections
+        const debugHandLandmarks = landmarks.map(lm => ({ ...lm, visibility: 1 })); // Ensure visibility for drawing
+        drawConnectors(
             canvasCtx,
             debugHandLandmarks,
-            HAND_CONNECTIONS, // This will be the global HAND_CONNECTIONS
+            HAND_CONNECTIONS,
             { color: "#00FF00", lineWidth: 5 }
         );
-        drawLandmarks( // Call the global function
+        drawLandmarks(
             canvasCtx,
             debugHandLandmarks,
             {
@@ -272,6 +287,7 @@ async function predictWebcam() {
         }
     }
 
+    // Process Face Center (from FaceLandmarker's bounding box)
     if (faceResults && faceResults.faceRects && faceResults.faceRects.length > 0) {
         const faceRect = faceResults.faceRects[0].boundingBox;
         // Face Landmarker results also provide `faceRects` as bounding boxes
@@ -279,6 +295,7 @@ async function predictWebcam() {
         const face_y = faceRect.y + faceRect.height / 2;
         features.push(face_x, face_y);
 
+        // Draw bounding box for the face
         canvasCtx.strokeStyle = '#00BFFF';
         canvasCtx.lineWidth = 2;
         // MediaPipe Tasks bounding boxes are normalized [0,1], so multiply by canvas dimensions
@@ -288,32 +305,42 @@ async function predictWebcam() {
         features.push(0, 0); // Push 2 zeros if no face detected
     }
 
+    // Process Chest Position (midpoint of shoulders from PoseLandmarker)
     if (poseResults && poseResults.landmarks && poseResults.landmarks.length > 0) {
         const poseLandmarks = poseResults.landmarks[0];
-        const LEFT_SHOULDER_IDX = 11;
-        const RIGHT_SHOULDER_IDX = 12;
+        const LEFT_SHOULDER_IDX = 11; // Standard MediaPipe Pose landmark index
+        const RIGHT_SHOULDER_IDX = 12; // Standard MediaPipe Pose landmark index
 
         const leftShoulder = poseLandmarks[LEFT_SHOULDER_IDX];
         const rightShoulder = poseLandmarks[RIGHT_SHOULDER_IDX];
 
         // Check if shoulders are detected with sufficient visibility
+        // Visibility is often used to determine reliability of a landmark
         if (leftShoulder && rightShoulder && leftShoulder.visibility > 0.5 && rightShoulder.visibility > 0.5) {
             const chest_x = (leftShoulder.x + rightShoulder.x) / 2;
             const chest_y = (leftShoulder.y + rightShoulder.y) / 2;
             features.push(chest_x, chest_y);
 
+            // Draw pose landmarks and connections (e.g., shoulders, and potentially other relevant pose points)
             const debugPoseLandmarks = poseLandmarks.map(lm => ({ ...lm, visibility: 1 }));
-            drawConnectors( // Call the global function
+            drawConnectors(
                 canvasCtx,
                 debugPoseLandmarks,
-                POSE_CONNECTIONS, // This will be the global POSE_CONNECTIONS
+                POSE_CONNECTIONS,
                 { color: '#FFFF00', lineWidth: 2 }
             );
-            drawLandmarks( // Call the global function
+            // Optionally draw just the shoulders or chest point
+            drawLandmarks(
                 canvasCtx,
-                [leftShoulder, rightShoulder],
+                [leftShoulder, rightShoulder], // Just highlight shoulders
                 { color: '#00FFFF', lineWidth: 5 }
             );
+            // Also draw the calculated chest midpoint
+            canvasCtx.beginPath();
+            canvasCtx.arc(chest_x * canvasElement.width, chest_y * canvasElement.height, 5, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = '#FF00FF'; // Magenta for chest point
+            canvasCtx.fill();
+
         } else {
             features.push(0, 0); // Push 2 zeros if shoulders not detected or not visible
         }
@@ -322,7 +349,7 @@ async function predictWebcam() {
     }
 
     // Final check for feature length
-    // The current logic produces 46 features.
+    // The current logic produces 46 features: (21 hand x,y) + (1 face_center x,y) + (1 chest_center x,y) = 42 + 2 + 2 = 46
     // Ensure your Python backend (server.py and train_model.py)
     // is configured to expect 46 features (EXPECTED_FEATURE_COUNT = 46).
     if (features.length !== 46) {
@@ -367,8 +394,9 @@ async function predictWebcam() {
         }
     }
 
-    canvasCtx.restore();
+    canvasCtx.restore(); // Restore the canvas state (undo the flip)
 
+    // Continue the prediction loop only if webcam is still running
     if (webcamRunning === true) {
         window.requestAnimationFrame(predictWebcam);
     }
