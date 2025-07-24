@@ -1,6 +1,5 @@
 // video_detection.ts
 // 1. Core MediaPipe Tasks Vision imports
-import { HandLandmarker, FilesetResolver, FaceLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 // 2. MediaPipe Drawing Utilities imports
 import { DrawingUtils } from "@mediapipe/drawing_utils";
 

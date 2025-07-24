@@ -52,7 +52,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 // 1. Core MediaPipe Tasks Vision imports
 // This is the ONLY import needed from @mediapipe/tasks-vision.
 // We are NOT importing DrawingUtils from here.
-import { HandLandmarker, FilesetResolver, FaceLandmarker, PoseLandmarker, } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
 // 2. Declare all DOM elements and state variables at the top-level
 var demosSection = document.getElementById("demos");
 var predictionResult = document.getElementById("predictionResult");
