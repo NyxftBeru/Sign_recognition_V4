@@ -10,11 +10,10 @@ const PORT = process.env.PORT || 3000;
 
 // MySQL connection configuration
 const connection = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false } // Only if using an SSL-enabled database and you want to bypass strict certificate checks (not recommended for production without proper certs)
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'sign_language'
 });
 
 connection.connect((err) => {
@@ -35,7 +34,7 @@ app.set('views', __dirname);
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.urlencoded({ extended: false }));
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'fallback_secret_if_not_set', // Use an env var,
+    secret: 'secret',
     resave: false,
     saveUninitialized: true,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 }
