@@ -1,5 +1,9 @@
 // video_detection.ts
+// 1. Core MediaPipe Tasks Vision imports
 import { HandLandmarker, FilesetResolver, FaceLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
+// 2. MediaPipe Drawing Utilities imports
+import { DrawingUtils } from "@mediapipe/drawing_utils";
+
 // UI elements from video_detection.html
 const videoFileInput = document.getElementById("videoFileInput");
 const uploadedVideoContainer = document.getElementById("uploadedVideoContainer");
@@ -7,17 +11,58 @@ const uploadedVideoElement = document.getElementById("uploadedVideo");
 const uploadedVideoCanvasElement = document.getElementById("uploadedVideoCanvas");
 const uploadedVideoCanvasCtx = uploadedVideoCanvasElement?.getContext("2d");
 const videoPredictionResultElement = document.getElementById("videoPredictionResult");
+
 // Ensure predictionResult for webcam section is also defined if it exists
+// This might be redundant if this file is only for video upload.
+// If it's used for both, ensure 'predictionResult' refers to the correct element.
 const predictionResult = document.getElementById("predictionResult");
+
 let handLandmarker = undefined;
 let faceLandmarker = undefined;
 let poseLandmarker = undefined;
+
+// Declare DrawingUtils instance
+let drawingUtils = undefined;
+
+// MediaPipe connections from @mediapipe/tasks-vision (for drawing)
+// These are not directly exported by DrawingUtils, but are constants from the main solutions.
+// We need to define them or import them if the tasks-vision bundle doesn't make them available globally
+// or if they are not exposed for direct import.
+// For now, let's define them as they are standard.
+// For Hands
+const HAND_CONNECTIONS = [
+    [0, 1], [1, 2], [2, 3], [3, 4],
+    [0, 5], [5, 6], [6, 7], [7, 8],
+    [5, 9], [9, 10], [10, 11], [11, 12],
+    [9, 13], [13, 14], [14, 15], [15, 16],
+    [13, 17], [17, 18], [18, 19], [19, 20],
+    [0, 17] // Palm base connection
+];
+
+// For Pose (simplified for general drawing, full list is very long)
+// We'll use a subset or rely on the DrawingUtils to have the correct ones if we use its drawConnectors
+// Let's assume the pose connections are needed for drawing specific keypoints for chest etc.
+// For a complete list, you would usually import from @mediapipe/pose.
+// Since we only care about shoulders for features, we just need to ensure drawing utilities work.
+// Let's adapt from predict_live.py's usage:
+// mp_pose.PoseLandmark.LEFT_SHOULDER and RIGHT_SHOULDER are indices.
+const POSE_CONNECTIONS = [
+    [11, 12] // Left shoulder to Right shoulder (for drawing a line between them if desired)
+    // Add other relevant pose connections if you visualize the whole pose.
+];
+
+
 // --- Model Loading ---
 // This function initializes all MediaPipe models (Hand, Face, Pose Landmarkers).
 const createDetectors = async () => {
     try {
         // Resolve the Wasm files for MediaPipe Tasks Vision API.
         const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+
+        // Initialize DrawingUtils with the canvas context
+        drawingUtils = new DrawingUtils(uploadedVideoCanvasCtx);
+
+
         // Initialize HandLandmarker with a single hand.
         const handOptions = {
             baseOptions: {
@@ -29,10 +74,10 @@ const createDetectors = async () => {
         };
         handLandmarker = await HandLandmarker.createFromOptions(vision, handOptions);
         console.log("HandLandmarker model loaded successfully!");
+
         // Initialize FaceLandmarker for single face detection.
         const faceOptions = {
             baseOptions: {
-                // CORRECTED THE TYPO HERE: storage.com changed to storage.googleapis.com
                 modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
                 delegate: "GPU"
             },
@@ -42,6 +87,7 @@ const createDetectors = async () => {
         };
         faceLandmarker = await FaceLandmarker.createFromOptions(vision, faceOptions);
         console.log("FaceLandmarker model loaded successfully!");
+
         // Initialize PoseLandmarker for single pose detection.
         const poseOptions = {
             baseOptions: {
@@ -53,6 +99,7 @@ const createDetectors = async () => {
         };
         poseLandmarker = await PoseLandmarker.createFromOptions(vision, poseOptions);
         console.log("PoseLandmarker model loaded successfully!");
+
         // Update the prediction result display to indicate readiness.
         if (videoPredictionResultElement) {
             videoPredictionResultElement.innerText = "Prediction: Models loaded, waiting for video upload...";
@@ -73,22 +120,27 @@ const createDetectors = async () => {
     }
 };
 createDetectors(); // Call the function to create all detectors immediately on page load
+
 // --- NEW: Handle Video File Upload ---
 let lastUploadedVideoTime = -1;
 let uploadedVideoRunning = false;
+
 if (videoFileInput) {
     videoFileInput.addEventListener('change', (event) => {
         const files = event.target.files;
         if (files && files.length > 0) {
             const file = files[0];
             const videoURL = URL.createObjectURL(file);
+
             // Set video source and make container visible
             uploadedVideoElement.src = videoURL;
             uploadedVideoContainer.style.display = 'block';
+
             // Reset prediction display
             if (videoPredictionResultElement) {
                 videoPredictionResultElement.innerText = "Prediction: Loading video...";
             }
+
             // Ensure canvas matches video size when video metadata is loaded
             uploadedVideoElement.onloadedmetadata = () => {
                 if (uploadedVideoCanvasElement && uploadedVideoElement) {
@@ -99,6 +151,7 @@ if (videoFileInput) {
                     uploadedVideoCanvasElement.style.height = uploadedVideoElement.offsetHeight + "px";
                 }
             };
+
             // Start prediction when video starts playing
             uploadedVideoElement.addEventListener('play', () => {
                 uploadedVideoRunning = true;
@@ -115,15 +168,17 @@ if (videoFileInput) {
         }
     });
 }
+
 // NEW FUNCTION: Predict for Uploaded Video
 async function predictUploadedVideo() {
-    if (!uploadedVideoElement || !uploadedVideoCanvasElement || !uploadedVideoCanvasCtx || !handLandmarker || !faceLandmarker || !poseLandmarker) {
+    if (!uploadedVideoElement || !uploadedVideoCanvasElement || !uploadedVideoCanvasCtx || !handLandmarker || !faceLandmarker || !poseLandmarker || !drawingUtils) {
         console.warn("Required elements or MediaPipe detectors not ready for uploaded video prediction.");
         if (uploadedVideoRunning) {
             window.requestAnimationFrame(predictUploadedVideo); // Continue trying if still supposed to be running
         }
         return;
     }
+
     if (uploadedVideoElement.paused || uploadedVideoElement.ended) {
         uploadedVideoRunning = false;
         if (videoPredictionResultElement) {
@@ -131,7 +186,9 @@ async function predictUploadedVideo() {
         }
         return;
     }
+
     let startTimeMs = performance.now();
+
     // Only detect if the video frame has changed
     if (lastUploadedVideoTime !== uploadedVideoElement.currentTime) {
         lastUploadedVideoTime = uploadedVideoElement.currentTime;
@@ -139,11 +196,14 @@ async function predictUploadedVideo() {
         faceResults = faceLandmarker.detectForVideo(uploadedVideoElement, startTimeMs);
         poseResults = poseLandmarker.detectForVideo(uploadedVideoElement, startTimeMs);
     }
+
     uploadedVideoCanvasCtx.save();
     uploadedVideoCanvasCtx.clearRect(0, 0, uploadedVideoCanvasElement.width, uploadedVideoCanvasElement.height);
     // Draw the video frame onto the canvas
     uploadedVideoCanvasCtx.drawImage(uploadedVideoElement, 0, 0, uploadedVideoCanvasElement.width, uploadedVideoCanvasElement.height);
+
     const features = [];
+
     // 1. Extract Hand Landmarks (21 landmarks * 2 coordinates = 42 features)
     if (handResults && handResults.landmarks && handResults.landmarks.length > 0) {
         const landmarks = handResults.landmarks[0];
@@ -151,13 +211,14 @@ async function predictUploadedVideo() {
             features.push(landmark.x, landmark.y);
         }
         const debugHandLandmarks = landmarks.map((lm) => ({ ...lm, visibility: 1 }));
-        drawConnectors(uploadedVideoCanvasCtx, debugHandLandmarks, HAND_CONNECTIONS, { color: "#00FF00", lineWidth: 5 });
-        drawLandmarks(uploadedVideoCanvasCtx, debugHandLandmarks, { color: "#FF0000", lineWidth: 2 });
+        drawingUtils.drawConnectors(debugHandLandmarks, HandLandmarker.HAND_CONNECTIONS, { color: "#00FF00", lineWidth: 5 });
+        drawingUtils.drawLandmarks(debugHandLandmarks, { color: "#FF0000", lineWidth: 2 });
     }
     else {
         for (let i = 0; i < 42; i++)
             features.push(0);
     }
+
     // 2. Extract Face Center (Bounding Box Center) (2 features)
     if (faceResults && faceResults.faceRects && faceResults.faceRects.length > 0) {
         const faceRect = faceResults.faceRects[0].boundingBox;
@@ -171,6 +232,7 @@ async function predictUploadedVideo() {
     else {
         features.push(0, 0);
     }
+
     // 3. Extract Chest Position (average of shoulder landmarks) (2 features)
     if (poseResults && poseResults.landmarks && poseResults.landmarks.length > 0) {
         const poseLandmarks = poseResults.landmarks[0];
@@ -178,13 +240,15 @@ async function predictUploadedVideo() {
         const RIGHT_SHOULDER_IDX = 12;
         const leftShoulder = poseLandmarks[LEFT_SHOULDER_IDX];
         const rightShoulder = poseLandmarks[RIGHT_SHOULDER_IDX];
+
         if (leftShoulder && rightShoulder && leftShoulder.visibility > 0.5 && rightShoulder.visibility > 0.5) {
             const chest_x = (leftShoulder.x + rightShoulder.x) / 2;
             const chest_y = (leftShoulder.y + rightShoulder.y) / 2;
             features.push(chest_x, chest_y);
             const debugPoseLandmarks = poseLandmarks.map((lm) => ({ ...lm, visibility: 1 }));
-            drawConnectors(uploadedVideoCanvasCtx, debugPoseLandmarks, POSE_CONNECTIONS, { color: '#FFFF00', lineWidth: 2 });
-            drawLandmarks(uploadedVideoCanvasCtx, [leftShoulder, rightShoulder], { color: '#00FFFF', lineWidth: 5 });
+            // Use PoseLandmarker.POSE_CONNECTIONS for drawing if available, otherwise define a subset
+            drawingUtils.drawConnectors(debugPoseLandmarks, PoseLandmarker.POSE_CONNECTIONS, { color: '#FFFF00', lineWidth: 2 });
+            drawingUtils.drawLandmarks([leftShoulder, rightShoulder], { color: '#00FFFF', lineWidth: 5 });
         }
         else {
             features.push(0, 0);
@@ -193,6 +257,7 @@ async function predictUploadedVideo() {
     else {
         features.push(0, 0);
     }
+
     // Ensure features array has exactly 46 elements
     if (features.length !== 46) {
         console.warn(`Feature array length mismatch: Expected 46, got ${features.length}. Padding/truncating.`);
@@ -201,16 +266,18 @@ async function predictUploadedVideo() {
         if (features.length > 46)
             features.splice(46);
     }
+
     // Send features to Flask server for prediction
     try {
-        const response = await fetch('https://sign-recognition-v4.onrender.com', {
+        const response = await fetch('https://sign-recognition-v4.onrender.com/predict', { // Added /predict endpoint
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ features: features })
         });
+
         if (response.ok) {
             const data = await response.json();
-            const prediction = data.prediction;
+            const prediction = data.predicted_gloss; // Changed from data.prediction to data.predicted_gloss
             if (videoPredictionResultElement) {
                 videoPredictionResultElement.innerText = `Prediction: ${prediction}`;
             }
@@ -228,12 +295,15 @@ async function predictUploadedVideo() {
             videoPredictionResultElement.innerText = 'Prediction: Network Error (Is server running?)';
         }
     }
+
     uploadedVideoCanvasCtx.restore();
+
     // Call this function again to keep predicting when the browser is ready.
     if (uploadedVideoRunning) {
         window.requestAnimationFrame(predictUploadedVideo);
     }
 }
+
 // --- Existing Webcam Continuous Detection ---
 const demosSection = document.getElementById("demos");
 const video = document.getElementById("webcam"); // Assuming this is for webcam
@@ -241,8 +311,10 @@ const canvasElement = document.getElementById("output_canvas");
 const canvasCtx = canvasElement?.getContext("2d");
 let enableWebcamButton = null;
 let webcamRunning = false;
+
 // Check if webcam access is supported.
 const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
+
 // If webcam supported, add event listener to button for when user
 // wants to activate it.
 if (hasGetUserMedia()) {
@@ -261,12 +333,14 @@ if (hasGetUserMedia()) {
 else {
     console.warn("getUserMedia() is not supported by your browser");
 }
+
 // Enable the live webcam view and start detection.
 function enableCam(event) {
-    if (!handLandmarker || !faceLandmarker || !poseLandmarker) { // Ensure all are loaded
+    if (!handLandmarker || !faceLandmarker || !poseLandmarker || !drawingUtils) { // Ensure all are loaded
         console.log("Wait! MediaPipe detectors not loaded yet.");
         return;
     }
+
     if (webcamRunning === true) {
         webcamRunning = false;
         if (enableWebcamButton)
@@ -288,10 +362,12 @@ function enableCam(event) {
         webcamRunning = true;
         if (enableWebcamButton)
             enableWebcamButton.innerText = "DISABLE PREDICTIONS";
+
         // getUsermedia parameters.
         const constraints = {
             video: true
         };
+
         // Activate the webcam stream.
         navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
             video.srcObject = stream;
@@ -307,24 +383,29 @@ function enableCam(event) {
         });
     }
 }
+
 let lastVideoTime = -1;
 let handResults = undefined; // Using these for both webcam and uploaded video now
 let faceResults = undefined;
 let poseResults = undefined;
+
 async function predictWebcam() {
-    if (!video || !canvasElement || !canvasCtx || !handLandmarker || !faceLandmarker || !poseLandmarker) {
+    if (!video || !canvasElement || !canvasCtx || !handLandmarker || !faceLandmarker || !poseLandmarker || !drawingUtils) {
         console.warn("Required elements or MediaPipe detectors not ready for webcam prediction.");
         if (webcamRunning) {
             window.requestAnimationFrame(predictWebcam);
         }
         return;
     }
+
     // Adjust canvas dimensions to match video feed
     canvasElement.style.width = video.offsetWidth + "px";
     canvasElement.style.height = video.offsetHeight + "px";
     canvasElement.width = video.videoWidth;
     canvasElement.height = video.videoHeight;
+
     let startTimeMs = performance.now();
+
     // Only detect for video if the video frame has changed
     if (lastVideoTime !== video.currentTime) {
         lastVideoTime = video.currentTime;
@@ -336,13 +417,16 @@ async function predictWebcam() {
     else {
         // console.log("Video frame not changed, skipping detection for this frame."); // Too noisy for webcam
     }
+
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     // Apply a horizontal flip transformation to the canvas context for non-mirrored webcam display
     canvasCtx.scale(-1, 1);
     canvasCtx.translate(-canvasElement.width, 0);
     canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
     const features = [];
+
     // 1. Extract Hand Landmarks (21 landmarks * 2 coordinates = 42 features)
     if (handResults && handResults.landmarks && handResults.landmarks.length > 0) {
         const landmarks = handResults.landmarks[0];
@@ -350,11 +434,11 @@ async function predictWebcam() {
             features.push(landmark.x, landmark.y);
         }
         const debugHandLandmarks = landmarks.map((lm) => ({ ...lm, visibility: 1 }));
-        drawConnectors(canvasCtx, debugHandLandmarks, HAND_CONNECTIONS, {
+        drawingUtils.drawConnectors(debugHandLandmarks, HandLandmarker.HAND_CONNECTIONS, {
             color: "#00FF00",
             lineWidth: 5
         });
-        drawLandmarks(canvasCtx, debugHandLandmarks, {
+        drawingUtils.drawLandmarks(debugHandLandmarks, {
             color: "#FF0000",
             lineWidth: 2
         });
@@ -365,6 +449,7 @@ async function predictWebcam() {
             features.push(0);
         }
     }
+
     // 2. Extract Face Center (Bounding Box Center) (2 features)
     if (faceResults && faceResults.faceRects && faceResults.faceRects.length > 0) {
         const faceRect = faceResults.faceRects[0].boundingBox;
@@ -379,6 +464,7 @@ async function predictWebcam() {
     else {
         features.push(0, 0);
     }
+
     // 3. Extract Chest Position (average of shoulder landmarks) (2 features)
     if (poseResults && poseResults.landmarks && poseResults.landmarks.length > 0) {
         const poseLandmarks = poseResults.landmarks[0];
@@ -386,14 +472,15 @@ async function predictWebcam() {
         const RIGHT_SHOULDER_IDX = 12;
         const leftShoulder = poseLandmarks[LEFT_SHOULDER_IDX];
         const rightShoulder = poseLandmarks[RIGHT_SHOULDER_IDX];
+
         if (leftShoulder && rightShoulder && leftShoulder.visibility > 0.5 && rightShoulder.visibility > 0.5) {
             const chest_x = (leftShoulder.x + rightShoulder.x) / 2;
             const chest_y = (leftShoulder.y + rightShoulder.y) / 2;
             features.push(chest_x, chest_y);
             const debugPoseLandmarks = poseLandmarks.map((lm) => ({ ...lm, visibility: 1 }));
-            // Draw pose landmarks (optional, for debugging/visualization)
-            drawConnectors(canvasCtx, debugPoseLandmarks, POSE_CONNECTIONS, { color: '#FFFF00', lineWidth: 2 });
-            drawLandmarks(canvasCtx, [leftShoulder, rightShoulder], { color: '#00FFFF', lineWidth: 5 });
+            // Use PoseLandmarker.POSE_CONNECTIONS for drawing if available, otherwise define a subset
+            drawingUtils.drawConnectors(debugPoseLandmarks, PoseLandmarker.POSE_CONNECTIONS, { color: '#FFFF00', lineWidth: 2 });
+            drawingUtils.drawLandmarks([leftShoulder, rightShoulder], { color: '#00FFFF', lineWidth: 5 });
         }
         else {
             features.push(0, 0);
@@ -402,6 +489,7 @@ async function predictWebcam() {
     else {
         features.push(0, 0);
     }
+
     // Ensure features array has exactly 46 elements
     if (features.length !== 46) {
         console.warn(`Feature array length mismatch: Expected 46, got ${features.length}. Padding/truncating.`);
@@ -412,18 +500,20 @@ async function predictWebcam() {
             features.splice(46);
         }
     }
+
     // Send features to Flask server for prediction
     try {
-        const response = await fetch('https://sign-recognition-v4.onrender.com', {
+        const response = await fetch('https://sign-recognition-v4.onrender.com/predict', { // Added /predict endpoint
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ features: features })
         });
+
         if (response.ok) {
             const data = await response.json();
-            const prediction = data.prediction;
+            const prediction = data.predicted_gloss; // Changed from data.prediction to data.predicted_gloss
             if (predictionResult) {
                 predictionResult.innerText = `Prediction: ${prediction}`;
             }
@@ -441,7 +531,9 @@ async function predictWebcam() {
             predictionResult.innerText = 'Prediction: Network Error (Is server running?)';
         }
     }
+
     canvasCtx.restore();
+
     // Call this function again to keep predicting when the browser is ready.
     if (webcamRunning === true) {
         window.requestAnimationFrame(predictWebcam);
