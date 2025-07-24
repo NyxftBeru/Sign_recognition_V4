@@ -34,7 +34,7 @@ app.set('views', __dirname);
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.urlencoded({ extended: false }));
 app.use(session({
-    secret: 'secret',
+    secret: process.env.SESSION_SECRET || 'fallback_secret_if_not_set', // Use an env var,
     resave: false,
     saveUninitialized: true,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 }

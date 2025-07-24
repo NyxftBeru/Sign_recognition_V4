@@ -304,7 +304,7 @@ async function predictWebcam() {
     }
 
     try {
-        const response = await fetch('http://localhost:5000/predict', {
+        const response = await fetch('https://sign-recognition-v4.onrender.com', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
