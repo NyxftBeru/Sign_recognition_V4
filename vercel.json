@@ -1,0 +1,39 @@
+{
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist",
+        "buildCommand": "cd frontend && npm install && npm run build"
+      }
+    },
+    {
+      "src": "backend/server.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": [
+          "backend/model.pkl",
+          "backend/feature_names.pkl",
+          "backend/requirements.txt"
+        ],
+        "maxLambdaSize": "15mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/predict",
+      "dest": "backend/server.py",
+      "methods": ["POST"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/dist/$1"
+    }
+  ],
+  "ignore": [
+    "**/node_modules",
+    "**/.parcel-cache"
+  ]
+}
