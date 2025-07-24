@@ -10,10 +10,11 @@ const PORT = process.env.PORT || 3000;
 
 // MySQL connection configuration
 const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'sign_language'
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    ssl: { rejectUnauthorized: false } // Only if using an SSL-enabled database and you want to bypass strict certificate checks (not recommended for production without proper certs)
 });
 
 connection.connect((err) => {
