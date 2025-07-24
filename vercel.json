@@ -1,21 +1,21 @@
 {
   "builds": [
     {
-      "src": "frontend/package.json",
+      "src": "sign_recognition_web_fyp_ori/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist",
-        "buildCommand": "cd frontend && npm install && npm run build"
+        "buildCommand": "cd sign_recognition_web_fyp_ori && npm install && npm run build"
       }
     },
     {
-      "src": "backend/server.py",
+      "src": "Sign Language Hand Tracker_ori/server.py",
       "use": "@vercel/python",
       "config": {
         "includeFiles": [
-          "backend/model.pkl",
-          "backend/feature_names.pkl",
-          "backend/requirements.txt"
+          "Sign Language Hand Tracker_ori/model.pkl",
+          "Sign Language Hand Tracker_ori/feature_names.pkl",
+          "Sign Language Hand Tracker_ori/requirements.txt"
         ],
         "maxLambdaSize": "15mb"
       }
@@ -24,19 +24,12 @@
   "routes": [
     {
       "src": "/predict",
-      "dest": "backend/server.py",
+      "dest": "Sign Language Hand Tracker_ori/server.py",
       "methods": ["POST"]
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/$1"
+      "dest": "sign_recognition_web_fyp_ori/dist/$1"
     }
-  ],
-  "ignore": [
-    "**/node_modules",
-    "**/.parcel-cache",
-    "**/venv",
-    "**/asl_vid",
-    "**/frames"
   ]
 }
