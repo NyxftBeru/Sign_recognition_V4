@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SignEase Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;400&display=swap" rel="stylesheet">
+  <style>
+    body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); font-family: 'Poppins', sans-serif; min-height: 100vh; margin: 0; }
+    .login-container {
+      max-width: 600px;
+      margin: 80px auto;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 12px 40px rgba(44,62,80,0.15);
+      padding: 2.5rem 2rem 2rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .login-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #2c3e50;
+      letter-spacing: 1px;
+    }
+    .login-logo span {
+      color: #3498db;
+      margin-left: 4px;
+    }
+    h2 {
+      text-align: center;
+      color: #3498db;
+      margin-bottom: 2rem;
+      font-size: 1.7rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .form-group {
+      margin-bottom: 1.2rem;
+      position: relative;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      color: #2c3e50;
+      font-weight: 500;
+      font-size: 1rem;
+    }
+    .input-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #3498db;
+      font-size: 1.1rem;
+      opacity: 0.7;
+    }
+    input[type="text"], input[type="email"], input[type="password"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 8px;
+      border: 1.5px solid #3498db;
+      font-size: 1rem;
+      background: #fafdff;
+      transition: border 0.2s;
+      padding: 0.75rem 1rem;
+      margin: 0;
+      min-width: 0;
+      display: block;
+    }
+    input:focus {
+      border-color: #2980b9;
+      outline: none;
+    }
+    button {
+      width: 100%;
+      background: linear-gradient(90deg, #3498db 0%, #43e97b 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.85rem 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      box-shadow: 0 2px 8px rgba(44,62,80,0.08);
+    }
+    button:hover {
+      background: linear-gradient(90deg, #2980b9 0%, #43e97b 100%);
+    }
+    .error {
+      color: #e74c3c;
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.05rem;
+      font-weight: 500;
+    }
+    .signup-link {
+      display: block;
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #3498db;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 1.08rem;
+      transition: color 0.2s;
+    }
+    .signup-link:hover {
+      text-decoration: underline;
+      color: #2980b9;
+    }
+    @media (max-width: 600px) {
+      .login-container {
+        margin: 40px 8px;
+        padding: 2rem 1rem 1.5rem 1rem;
+      }
+      .login-logo {
+        font-size: 1.5rem;
+      }
+      h2 {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-logo">Sign<span>Ease</span></div>
+    <h2>SignEase Login</h2>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="error"><%= error %></div>
+    <% } %>
+    <form action="/login" method="POST">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+      </div>
+      <button type="submit">Login</button>
+    </form>
+    <a href="/signup" class="signup-link">Don't have an account? Sign up</a>
+  </div>
+</body>
+</html>
