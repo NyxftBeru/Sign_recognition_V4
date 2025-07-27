@@ -1,0 +1,178 @@
+{
+  "name": "KER-Web Chatbot SignEase",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ae3921d3-262c-4503-99f0-939fb4709ab7",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -60
+      ],
+      "id": "5a20f665-2c97-49f8-9561-7beef464833d",
+      "name": "Webhook",
+      "webhookId": "ae3921d3-262c-4503-99f0-939fb4709ab7"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.message }}",
+        "options": {
+          "systemMessage": "You are SignEase, a friendly and supportive chatbot designed to help users learn sign language.\n\nWhen a user sends a message, first check if their message matches any of the keywords from the provided google sheet (Copy of video(chatbot)). The keywords you can provide signs for are:\n\n- accident\n- africa\n- flower\n- black\n- blue\n- colors\n- computer\n- cow\n- eat\n- fine\n\nResponse Format:\nIf the user's message *matches* a keyword (case-insensitive and allowing for minor variations like plurals if your system supports it):\n1. Start with a positive, encouraging sentence (e.g., \"That's a great word to learn!\", \"You're doing great!\").\n2. Retrieve the text under Steps column that matches the sign column based on what the user asked for.\n3. Then, state: \"Here's a video to help you sign [keyword]:\"\n4. On a new, separate line, provide the full Google Drive video link. To fetch the link, use the Google Sheets tool to find the row where the 'key words' column matches the keyword, and then retrieve the value from the 'Link' column. Make sure to use the exact column names: 'key words', 'Link' and 'Steps'.\n4. End with a motivational line (e.g., \"Keep practicing!\", \"You’ve got this!\").\n\nExample for a matched keyword:\nThat's a great word to learn!\n\nTo sign \"Accident\" in American Sign Language (ASL), form a 'Y' shape with your dominant hand, then bring it up to your chin with your palm facing towards you.\n\nHere's a video to help you sign accident:\nhttps://drive.google.com/file/d/.../view?usp=sharing\n\nJUST Keep practicing!\n\nIf the user's message *does not* match a keyword from the list:\n1. Start with a welcoming and informative greeting, letting them know what words you can help with.\n2. List all the keywords you can teach signs for.\n3. Encourage them to pick a word from the list.\n\nExample for a non-matched keyword:\nHello! I'm SignEase, and I'm here to help you learn sign language.\n\nI can help you learn signs for the following words:\n- accident\n- africa\n- flower\n- black\n- blue\n- colors\n- computer\n- cow\n- eat\n- fine\n\nJust tell me which word you'd like to learn, and I'll provide you with a video! You've got this!\n\nGeneral Instructions:\n* Maintain a clear, warm, friendly, and supportive tone.\n* Avoid long explanations unless explicitly asked for more detail.\n* Ensure the full Google Drive video link is always on a separate line for easy extraction."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        252,
+        -60
+      ],
+      "id": "2521d4f8-4d18-4c00-8870-8b40de51751c",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        220,
+        160
+      ],
+      "id": "49c76eea-0c44-4d5f-af83-8e8f25fa2546",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "3h0gZrue2YAQiOZM",
+          "name": "Google Gemini(PaLM) Api account 6"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "076a4aae-6209-4459-8e5a-5556ddb557a7",
+              "name": "message",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        -60
+      ],
+      "id": "cce84c10-ce5e-44a4-a260-dad1bdc2a4a4",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sN3LE5IcaJWNS0m__6f0roUKiXDxmaNpz-OY17jg12w",
+          "mode": "list",
+          "cachedResultName": "Copy of video(chatbot)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sN3LE5IcaJWNS0m__6f0roUKiXDxmaNpz-OY17jg12w/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sN3LE5IcaJWNS0m__6f0roUKiXDxmaNpz-OY17jg12w/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.6,
+      "position": [
+        460,
+        160
+      ],
+      "id": "1fecda70-73ec-45c2-aca8-a2809461a395",
+      "name": "Video(chatbot)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "9jrhTfN0JvHJ3LNF",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        []
+      ]
+    },
+    "Video(chatbot)": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4519afd5-8641-44e4-9ac4-5fd3d545b5d2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cf3a703f62b241d723c6408cd209eb83842abb02d8d9bf4d928a2ce35586028c"
+  },
+  "id": "dptqh6JSKG4ku8Dx",
+  "tags": []
+}
