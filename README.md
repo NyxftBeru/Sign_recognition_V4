@@ -1,8 +1,11 @@
 SignEase: Interactive Sign Language Learning Platform
+
 🌟 Introduction
+
 SignEase is a web application designed to help beginners learn and practice sign language in a fun and interactive way. Our platform leverages real-time machine learning to recognize hand gestures via a webcam, providing instant feedback and creating an engaging learning experience. The project is a final year project developed to make sign language accessible to a wider audience.
 
 ✨ Features
+
 Real-time Sign Recognition: Use your webcam to practice sign language gestures. Our application processes video frames in the browser and sends landmark data to a backend model for a real-time prediction.
 
 Interactive Quiz: Test your knowledge with a multi-choice quiz featuring various signs.
@@ -14,6 +17,7 @@ User Authentication: A secure login and registration system allows users to trac
 Video Uploads: Upload a video to have the application analyze the signs within it.
 
 🚀 Technical Stack
+
 Our project is built with a decoupled, two-service architecture for improved scalability and maintainability.
 
 Frontend
