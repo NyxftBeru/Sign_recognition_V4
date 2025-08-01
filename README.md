@@ -16,6 +16,7 @@ User Authentication: A secure login and registration system allows users to trac
 
 Video Uploads: Upload a video to have the application analyze the signs within it.
 
+
 🚀 Technical Stack
 
 Our project is built with a decoupled, two-service architecture for improved scalability and maintainability.
@@ -39,7 +40,9 @@ joblib: A library for efficiently loading our pre-trained machine learning model
 Database
 MySQL: A relational database for storing and managing user data, including login credentials and profile information.
 
+
 📁 Project Architecture
+
 The application is structured into two main services:
 
 Frontend Service (Node.js/Express): This service is responsible for serving all the HTML, CSS, and client-side JavaScript files to the user's browser. It also handles all user-related functionality like login, registration, and profile management.
@@ -106,6 +109,7 @@ Khoo Jun Xuan
 Sancho Miguel
 
 🙏 Acknowledgements
+
 We extend our sincere gratitude to all who supported and guided us throughout the development of the SignEase project.
 
 Our deepest appreciation goes to our dedicated supervisor, Mr. Peter Kenny, for his invaluable guidance, constructive feedback, and unwavering support. His expertise was instrumental in navigating the complexities of this project.
@@ -115,4 +119,5 @@ We are also profoundly grateful to our evaluators, Mr. Frankie Cha and Mr. Flori
 Finally, we wish to express our heartfelt thanks to our friends and family for their continuous encouragement, understanding, and patience.
 
 📝 License
+
 This project is licensed under the MIT License.
